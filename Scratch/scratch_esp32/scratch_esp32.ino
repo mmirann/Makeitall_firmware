@@ -8,6 +8,7 @@
 
 #define SET_SERVICE_UUID     "c005"
 #define SET_NEOPIXEL_UUID    "d895d61e-902e-11eb-a8b3-0242ac130003"
+#define SET_PIN_UUID "d895d7cc-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
@@ -55,16 +56,14 @@ class MyBLEServerCallbacks: public BLEServerCallbacks {
   3. no_color: cmd, pin, r, g, b, num
   4. all_color: cmd, pin, r, g, b
 */
-class MyMiscSetColorLEDCallbacks: public BLECharacteristicCallbacks {
-
-
+class MyMiscSetNEOCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
       int cmd = value[0];
       int pin = value[1];
-      int led_num =4;
+      int led_num = 4;
       strip.begin();
-      
+
       if (cmd == 0) { //init
         led_num = value[2];
         strip.updateLength(led_num);
@@ -80,23 +79,42 @@ class MyMiscSetColorLEDCallbacks: public BLECharacteristicCallbacks {
       } else if (cmd == 2) { //clear
         strip.clear();
         strip.show();
-      }else{
-      int r = value[2];
-      int g = value[3];
-      int b = value[4];
+      } else {
+        int r = value[2];
+        int g = value[3];
+        int b = value[4];
 
-      if (cmd == 3) { // num color
-        int num = value[5];
-        strip.setPixelColor(num, r, g, b);
-        strip.show();
-      } else if (cmd == 4) { //all color
+        if (cmd == 3) { // num color
+          int num = value[5];
+          strip.setPixelColor(num, r, g, b);
+          strip.show();
+        } else if (cmd == 4) { //all color
 
-        for(int i=0;i<led_num;i++)
-           strip.setPixelColor(i, r, g, b);
-        strip.show();
-      
+          for (int i = 0; i < led_num; i++)
+            strip.setPixelColor(i, r, g, b);
+          strip.show();
+
+        }
       }
     }
+};
+
+// cmd pin value
+class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      int cmd = value[0];
+      int pin = value[1];
+      int _value = value[2];
+
+      if (cmd == 0) { //digital output
+        pinMode(pin, OUTPUT);
+        digitalWrite(pin, _value);
+      } else if (cmd == 1) { //pwm output
+        ledcAttachPin(pin, 0);
+        ledcSetup(0, 5000, 8);
+        ledcWrite(0, _value);
+      }
     }
 };
 
@@ -126,17 +144,25 @@ void setup() {
   // Misc Service
   BLEService *mServiceMisc = mServer->createService(BLEUUID(SET_SERVICE_UUID), 20);
 
-  // SetColorLED
-  BLECharacteristic *mCharMiscSetColorLED = mServiceMisc->createCharacteristic(
-        SET_NEOPIXEL_UUID,
-        BLECharacteristic::PROPERTY_WRITE_NR);
-  BLEDescriptor *mDescMiscSetColorLED = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  mDescMiscSetColorLED->setValue("NeoPixel Color RGB");
-  mCharMiscSetColorLED->addDescriptor(mDescMiscSetColorLED);
-  mCharMiscSetColorLED->setCallbacks(new MyMiscSetColorLEDCallbacks());
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("call neo");
+  // SET PIN
+  BLECharacteristic *mCharMiscSetPIN = mServiceMisc->createCharacteristic(
+                                         SET_PIN_UUID,
+                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetPIN = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetPIN->setValue("SET PIN WITH CMD");
+  mCharMiscSetPIN->addDescriptor(mDescMiscSetPIN);
+  mCharMiscSetPIN->setCallbacks(new MyMiscSetPINCallbacks());
+
+  // NEO PIXEL
+  BLECharacteristic *mCharMiscSetNEO = mServiceMisc->createCharacteristic(
+                                         SET_NEOPIXEL_UUID,
+                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetNEO = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetNEO->setValue("SET NEOPIXEL WITH CMD");
+  mCharMiscSetNEO->addDescriptor(mDescMiscSetNEO);
+  mCharMiscSetNEO->setCallbacks(new MyMiscSetNEOCallbacks());
+
+
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
                           MISC_CHARACTERISTIC_STATUS_INFO_UUID,
