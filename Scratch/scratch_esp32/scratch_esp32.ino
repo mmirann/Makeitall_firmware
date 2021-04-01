@@ -34,81 +34,91 @@ BLECharacteristic *mCharSensorAllData = NULL;
 
 //********************************************************
 //SENSOR
-
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(4, 13, NEO_GRB + NEO_KHZ800);
-LiquidCrystal_I2C lcd(0x27,20,4);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(4, 2, NEO_GRB + NEO_KHZ800);
 
 
 class MyBLEServerCallbacks: public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) {
-    device_connected = true;
-  }
+    void onConnect(BLEServer* pServer) {
+      device_connected = true;
+    }
 
-  void onDisconnect(BLEServer* pServer) {
-    device_connected = false;
-  }
+    void onDisconnect(BLEServer* pServer) {
+      device_connected = false;
+    }
 };
 
+/*
+  0. init: cmd, pin, led_num
+  1. brightness: cmd, pin, brightness
+  2. clear_all: cmd, pin
+  3. no_color: cmd, pin, r, g, b, num
+  4. all_color: cmd, pin, r, g, b
+*/
 class MyMiscSetColorLEDCallbacks: public BLECharacteristicCallbacks {
-  void onWrite(BLECharacteristic *pCharacteristic) {
-    std::string value = pCharacteristic->getValue();
-    if(value.length() == 3) {     
-    //   uint8_t left_r = value[0];
-    //   uint8_t left_g = value[1];
-    //   uint8_t left_b = value[2];
-    //   uint8_t right_r = value[3];
-    //   uint8_t right_g = value[4];
-    //   uint8_t right_b = value[5];
 
-    int r=value[0];
-    int g=value[1];
-    int b=value[2];
 
-    //   // reduce brightness from original rgb color
-    //   //1. rgb to hsv
-    //   float h, s, v;
-    //   rgbTohsv(left_r, left_g, left_b, h, s, v);
-    //   v = v / 20.0;
-    //   hsvTorgb(h, s, v, left_r, left_g, left_b);
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      int cmd = value[0];
+      int pin = value[1];
+      int led_num =4;
+      strip.begin();
       
-    //   rgbTohsv(right_r, right_g, right_b, h, s, v);
-    //   v = v / 20.0;
-    //   hsvTorgb(h, s, v, right_r, right_g, right_b);
-      
-    //   edubot.led.leftBright(left_r, left_g, left_b);
-    //   edubot.led.rightBright(right_r, right_g, right_b);
-        strip.begin();
+      if (cmd == 0) { //init
+        led_num = value[2];
+        strip.updateLength(led_num);
+        strip.setPin(pin);
+        //return;
 
-        strip.setPixelColor(0, r, g, b);
-        strip.setPixelColor(1, r, g, b);
-        strip.setPixelColor(2, r, g, b);
-        strip.setPixelColor(3, r, g, b);
+      } else if (cmd == 1) { //brightness
+        int brightness = value[2];
+        strip.setBrightness(brightness);
 
+        //return ;
+
+      } else if (cmd == 2) { //clear
+        strip.clear();
         strip.show();
+      }else{
+      int r = value[2];
+      int g = value[3];
+      int b = value[4];
+
+      if (cmd == 3) { // num color
+        int num = value[5];
+        strip.setPixelColor(num, r, g, b);
+        strip.show();
+      } else if (cmd == 4) { //all color
+
+        for(int i=0;i<led_num;i++)
+           strip.setPixelColor(i, r, g, b);
+        strip.show();
+      
+      }
     }
-  }
+    }
 };
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
 
-//************lcd**************
-    lcd.init();                      // initialize the lcd 
+  //************lcd**************
+  lcd.init();                      // initialize the lcd
   lcd.init();
   // Print a message to the LCD.
   lcd.backlight();
-//*****************************
-  lcd.setCursor(0,0);
-  lcd.print("Start begin");
+  lcd.clear();
+  //*****************************
 
   Serial.println("===============\nStarting BLE work!");
 
   BLEDevice::init("OROCA EduBot");
   BLEServer *mServer = BLEDevice::createServer();
   mServer->setCallbacks(new MyBLEServerCallbacks());
-  
-  BLEAddress addr = BLEDevice::getAddress();  
+
+  BLEAddress addr = BLEDevice::getAddress();
   memcpy(ble_mac_addr, *addr.getNative(), 6);
 
   //************************************************
@@ -118,25 +128,27 @@ void setup() {
 
   // SetColorLED
   BLECharacteristic *mCharMiscSetColorLED = mServiceMisc->createCharacteristic(
-                                         SET_NEOPIXEL_UUID,
-                                         BLECharacteristic::PROPERTY_WRITE_NR);
+        SET_NEOPIXEL_UUID,
+        BLECharacteristic::PROPERTY_WRITE_NR);
   BLEDescriptor *mDescMiscSetColorLED = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  mDescMiscSetColorLED->setValue("NeoPixel Color RGB");  
+  mDescMiscSetColorLED->setValue("NeoPixel Color RGB");
   mCharMiscSetColorLED->addDescriptor(mDescMiscSetColorLED);
   mCharMiscSetColorLED->setCallbacks(new MyMiscSetColorLEDCallbacks());
-
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("call neo");
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
-                                         MISC_CHARACTERISTIC_STATUS_INFO_UUID,
-                                         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+                          MISC_CHARACTERISTIC_STATUS_INFO_UUID,
+                          BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
   mCharMiscStatusInfo->setValue((uint8_t*)&value_misc_status_info, 1);
   BLEDescriptor *mDescMiscStatusInfo = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  mDescMiscStatusInfo->setValue("Status Info");  
+  mDescMiscStatusInfo->setValue("Status Info");
   mCharMiscStatusInfo->addDescriptor(mDescMiscStatusInfo);
   mCharMiscStatusInfo->addDescriptor(new BLE2902());
 
 
- mServiceMisc->start();
+  mServiceMisc->start();
   //************************************************
 
 
@@ -147,81 +159,75 @@ void setup() {
 
   // All Data
   mCharSensorAllData = mServiceSensor->createCharacteristic(
-                                         GET_BUTTON_UUID,
-                                         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-  
+                         GET_BUTTON_UUID,
+                         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+
   //30->1
   mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 30);
   BLEDescriptor *mDescSensorAllData = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  mDescSensorAllData->setValue("Update All Data for Scratch");  
+  mDescSensorAllData->setValue("Update All Data for Scratch");
   mCharSensorAllData->addDescriptor(mDescSensorAllData);
   mCharSensorAllData->addDescriptor(new BLE2902());
-  
+
   mServiceSensor->start();
   //************************************************
 
   BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  
+
   pAdvertising->addServiceUUID(GET_SERVICE_UUID);
   pAdvertising->addServiceUUID(SET_SERVICE_UUID);
-  
+
   pAdvertising->setScanResponse(true);
   pAdvertising->setMinPreferred(0x06);  // functions that help with iPhone connections issue
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
 
   Serial.println("Ready.!!");
-  
-  lcd.clear();
-  lcd.setCursor(0,0);
-  lcd.print("SETUP FINISH");
 
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
   //delay(10);
-  lcd.setCursor(0,0);
-  lcd.print("1");
+
   // Status LED
   status_led_count++;
-  if(status_led_count > 50) {
-    if(device_connected) {
-    //   edubot.ledOn();
+  if (status_led_count > 50) {
+    if (device_connected) {
+      //   edubot.ledOn();
 
-       if(status_text_displayed) {
-        lcd.setCursor(0, 0);
-        lcd.clear();
-        lcd.print("Ready for BLE");
+      if (status_text_displayed) {
+        // lcd.setCursor(0, 0);
+        // lcd.clear();
+        // lcd.print("Ready for BLE");
         status_text_displayed = false;
       }
     }
     else {
-    //   edubot.ledToggle();
+      //   edubot.ledToggle();
 
-      if(!status_text_displayed) {
-        lcd.clear();
-        lcd.setCursor(0,0);
-        lcd.print("JIKKO");
+      if (!status_text_displayed) {
+        // lcd.clear();
+        // lcd.setCursor(0,0);
+        // lcd.print("JIKKO");
         //char buf[20];
         //sprintf(buf, "%X:%X:%X:%X:%X:%X", ble_mac_addr[0], ble_mac_addr[1], ble_mac_addr[2], ble_mac_addr[3], ble_mac_addr[4], ble_mac_addr[5]);
         //lcd.setCursor(1,0);
-       // lcd.print(std::string(buf).c_str());
+        // lcd.print(std::string(buf).c_str());
         status_text_displayed = true;
-      } 
+      }
     }
     status_led_count = 0;
   }
 
-  lcd.setCursor(0,0);
-  lcd.print("3");
+
   // Status Info
   status_update_info_count++;
-  if(status_update_info_count > 5) {
+  if (status_update_info_count > 5) {
 
     // value_misc_status_info[0] = (uint8_t)edubot.motor.isBusy();
-    
-    
+
+
     // value_misc_status_info[1] = edubot.batteryGetVoltage();
     // if(value_misc_status_info[1] < 32) {
     //   value_misc_status_info[2] = 1;
@@ -229,42 +235,40 @@ void loop() {
     // else {
     //   value_misc_status_info[2] = 0;
     // }
-      pinMode(2, INPUT_PULLUP);
+    pinMode(2, INPUT_PULLUP);
 
-      if (digitalRead(2) == 0) {
-        lcd.setCursor(0,0);
-        lcd.print("push");
+    if (digitalRead(2) == 0) {
+      // lcd.setCursor(0,0);
+      // lcd.print("push");
       value_misc_status_info[0] = 1;
     }
     else {
 
-        lcd.setCursor(0,0);
-        lcd.print("pull");
+      // lcd.setCursor(0,0);
+      // lcd.print("pull");
       value_misc_status_info[0] = 0;
     }
 
     //4->1
     mCharMiscStatusInfo->setValue((uint8_t*)&value_misc_status_info, 1);
-    if(device_connected) {
+    if (device_connected) {
       mCharMiscStatusInfo->notify();
     }
     status_update_info_count = 0;
   }
 
   status_update_all_count++;
-  if(status_update_all_count > 5) {
+  if (status_update_all_count > 5) {
     memcpy(&value_sensor_all_data[0], value_misc_status_info, 1);
     // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
     // memcpy(&value_sensor_all_data[8], value_sensor_distance_sensors, 4);
     // memcpy(&value_sensor_all_data[12], value_sensor_imu_sensor, 18);
-  //30->1
-    mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data,1);
-    if(device_connected) {
+    //30->1
+    mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 1);
+    if (device_connected) {
       mCharSensorAllData->notify();
     }
-    
+
     status_update_all_count = 0;
   }
 }
-
-
