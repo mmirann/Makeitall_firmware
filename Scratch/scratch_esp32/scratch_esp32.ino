@@ -37,7 +37,7 @@ BLECharacteristic *mCharSensorAllData = NULL;
 //SENSOR
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(4, 2, NEO_GRB + NEO_KHZ800);
-
+int channel_cnt=0;
 
 class MyBLEServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -106,17 +106,21 @@ class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
       int cmd = value[0];
       int pin = value[1];
       int _value = value[2];
-
+      
       if (cmd == 0) { //digital output
         pinMode(pin, OUTPUT);
         digitalWrite(pin, _value);
       } else if (cmd == 1) { //pwm output
-        ledcAttachPin(pin, 0);
-        ledcSetup(0, 5000, 8);
-        ledcWrite(0, _value);
-      }
+        ledcSetup(channel_cnt, 5000, 8);
+        ledcAttachPin(pin, channel_cnt);
+        ledcWrite(channel_cnt, _value);
+        
+        channel_cnt>15?channel_cnt=0:channel_cnt++;
+      } 
     }
 };
+
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -153,7 +157,7 @@ void setup() {
   mCharMiscSetPIN->addDescriptor(mDescMiscSetPIN);
   mCharMiscSetPIN->setCallbacks(new MyMiscSetPINCallbacks());
 
-  // NEO PIXEL
+  // SET NEO PIXEL
   BLECharacteristic *mCharMiscSetNEO = mServiceMisc->createCharacteristic(
                                          SET_NEOPIXEL_UUID,
                                          BLECharacteristic::PROPERTY_WRITE_NR);
@@ -161,7 +165,6 @@ void setup() {
   mDescMiscSetNEO->setValue("SET NEOPIXEL WITH CMD");
   mCharMiscSetNEO->addDescriptor(mDescMiscSetNEO);
   mCharMiscSetNEO->setCallbacks(new MyMiscSetNEOCallbacks());
-
 
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
