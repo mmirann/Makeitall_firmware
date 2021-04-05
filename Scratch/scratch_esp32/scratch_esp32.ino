@@ -9,6 +9,7 @@
 #define SET_SERVICE_UUID     "c005"
 #define SET_NEOPIXEL_UUID    "d895d61e-902e-11eb-a8b3-0242ac130003"
 #define SET_PIN_UUID "d895d7cc-902e-11eb-a8b3-0242ac130003"
+#define SET_BUZZER_UUID "d895d952-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
@@ -16,9 +17,9 @@
 
 union
 {
-    byte byteVal[4];
-    float floatVal;
-    long longVal;
+  byte byteVal[4];
+  float floatVal;
+  long longVal;
 } val;
 
 char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
@@ -78,13 +79,10 @@ class MyMiscSetNEOCallbacks: public BLECharacteristicCallbacks {
         led_num = value[2];
         strip.updateLength(led_num);
         strip.setPin(pin);
-        //return;
 
       } else if (cmd == 1) { //brightness
         int brightness = value[2];
         strip.setBrightness(brightness);
-
-        //return ;
 
       } else if (cmd == 2) { //clear
         strip.clear();
@@ -129,7 +127,7 @@ class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
         analog_cnt >= 12 ? analog_cnt = 0 : analog_cnt++;
 
       } else if (cmd == 2) { //servo pwm
-        int duty = _value*18.2 + 3277;
+        int duty = _value * 18.2 + 3277;
         ledcSetup(servoChannel[servo_cnt], 50, 16);
         ledcAttachPin(pin, servoChannel[servo_cnt]);
         ledcWrite(servoChannel[servo_cnt], duty);
@@ -137,6 +135,26 @@ class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
         servo_cnt >= 4 ? servo_cnt = 0 : servo_cnt++;
 
       }
+    }
+};
+
+class MyMiscSetBUZZERCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      int pin = value[0];
+      int note = value[1];
+      int beats = value[2];
+      int duration = 2000 / beats;
+
+      ledcSetup(analogChannel[analog_cnt], 5000, 8);
+      ledcAttachPin(pin, analogChannel[analog_cnt]);
+      ledcWriteTone(analogChannel[analog_cnt], note);
+      delay(1000); //동안 재생
+      ledcWriteTone(analogChannel[analog_cnt], 0);
+      delay(10);
+
+      analog_cnt >= 12 ? analog_cnt = 0 : analog_cnt++;
+
     }
 };
 
@@ -156,7 +174,7 @@ void setup() {
 
   Serial.println("===============\nStarting BLE work!");
 
-  BLEDevice::init("OROCA EduBot");
+  BLEDevice::init("JIKKO BOARD");
   BLEServer *mServer = BLEDevice::createServer();
   mServer->setCallbacks(new MyBLEServerCallbacks());
 
@@ -185,6 +203,14 @@ void setup() {
   mDescMiscSetNEO->setValue("SET NEOPIXEL WITH CMD");
   mCharMiscSetNEO->addDescriptor(mDescMiscSetNEO);
   mCharMiscSetNEO->setCallbacks(new MyMiscSetNEOCallbacks());
+
+  BLECharacteristic *mCharMiscSetBUZZER = mServiceMisc->createCharacteristic(
+      SET_BUZZER_UUID,
+      BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetBUZZER = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetBUZZER->setValue("SET BUZZER WITH CMD");
+  mCharMiscSetBUZZER->addDescriptor(mDescMiscSetBUZZER);
+  mCharMiscSetBUZZER->setCallbacks(new MyMiscSetBUZZERCallbacks());
 
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
