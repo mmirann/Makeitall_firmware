@@ -14,6 +14,13 @@
 #define GET_SERVICE_UUID     "c006"
 #define GET_BUTTON_UUID      "d895d704-902e-11eb-a8b3-0242ac130003"
 
+union
+{
+    byte byteVal[4];
+    float floatVal;
+    long longVal;
+} val;
+
 char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
 
 uint8_t value_misc_status_info[4] = {0, 0, 0, 0};
@@ -37,7 +44,10 @@ BLECharacteristic *mCharSensorAllData = NULL;
 //SENSOR
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(4, 2, NEO_GRB + NEO_KHZ800);
-int channel_cnt=0;
+int analogChannel[12] = {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13};
+int analog_cnt = 0;
+int servoChannel[4] = {6, 7, 14, 15};
+int servo_cnt = 0;
 
 class MyBLEServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -106,17 +116,27 @@ class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
       int cmd = value[0];
       int pin = value[1];
       int _value = value[2];
-      
+
       if (cmd == 0) { //digital output
         pinMode(pin, OUTPUT);
         digitalWrite(pin, _value);
+
       } else if (cmd == 1) { //pwm output
-        ledcSetup(channel_cnt, 5000, 8);
-        ledcAttachPin(pin, channel_cnt);
-        ledcWrite(channel_cnt, _value);
-        
-        channel_cnt>15?channel_cnt=0:channel_cnt++;
-      } 
+        ledcSetup(analogChannel[analog_cnt], 5000, 8);
+        ledcAttachPin(pin, analogChannel[analog_cnt]);
+        ledcWrite(analogChannel[analog_cnt], _value);
+
+        analog_cnt >= 12 ? analog_cnt = 0 : analog_cnt++;
+
+      } else if (cmd == 2) { //servo pwm
+        int duty = _value*18.2 + 3277;
+        ledcSetup(servoChannel[servo_cnt], 50, 16);
+        ledcAttachPin(pin, servoChannel[servo_cnt]);
+        ledcWrite(servoChannel[servo_cnt], duty);
+
+        servo_cnt >= 4 ? servo_cnt = 0 : servo_cnt++;
+
+      }
     }
 };
 
