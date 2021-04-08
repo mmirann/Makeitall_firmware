@@ -2,6 +2,7 @@
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <Wire.h>
 #include <Adafruit_NeoPixel.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -10,17 +11,11 @@
 #define SET_NEOPIXEL_UUID    "d895d61e-902e-11eb-a8b3-0242ac130003"
 #define SET_PIN_UUID "d895d7cc-902e-11eb-a8b3-0242ac130003"
 #define SET_BUZZER_UUID "d895d952-902e-11eb-a8b3-0242ac130003"
+#define SET_LCD_UUID "d895dc2c-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
 #define GET_BUTTON_UUID      "d895d704-902e-11eb-a8b3-0242ac130003"
-
-union
-{
-  byte byteVal[4];
-  float floatVal;
-  long longVal;
-} val;
 
 char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
 
@@ -149,20 +144,45 @@ class MyMiscSetBUZZERCallbacks: public BLECharacteristicCallbacks {
 
       ledcSetup(analogChannel[analog_cnt], 5000, 8);
       ledcAttachPin(pin, analogChannel[analog_cnt]);
-        // if (millis() - beepTime >= duration) {
-        //   beepTime = millis();
+
       ledcWrite(analogChannel[analog_cnt], 0);
       ledcWriteTone(analogChannel[analog_cnt], note);
-      delay(beats*1000);
+      delay(beats * 1000);
       ledcWrite(analogChannel[analog_cnt], 0);
 
-        // }
-      // delay(1000); //동안 재생
-      // ledcWriteTone(analogChannel[analog_cnt], 0);
-      // delay(10);
 
       analog_cnt >= 12 ? analog_cnt = 0 : analog_cnt++;
 
+    }
+};
+
+class MyMiscSetLCDCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      String str="";
+      int cmd = value[0];
+
+      if (cmd == 0) {
+        int column = value[1];
+        int row = value[2];
+        lcd = LiquidCrystal_I2C(0x27, column, row);
+        lcd.init();
+        lcd.backlight();
+        lcd.clear();
+        
+      } else if (cmd == 1) {
+        lcd.clear();
+
+      } else if (cmd == 2) {
+        int column = value[1];
+        int row = value[2];
+        int textLen=value[3];
+        for(int i=4;i<4+textLen;i++){
+          str+=(char)value[i];
+        }
+        lcd.setCursor(column, row);
+        lcd.print(str);
+      }
     }
 };
 
@@ -219,6 +239,14 @@ void setup() {
   mDescMiscSetBUZZER->setValue("SET BUZZER WITH CMD");
   mCharMiscSetBUZZER->addDescriptor(mDescMiscSetBUZZER);
   mCharMiscSetBUZZER->setCallbacks(new MyMiscSetBUZZERCallbacks());
+
+  BLECharacteristic *mCharMiscSetLCD = mServiceMisc->createCharacteristic(
+                                         SET_LCD_UUID,
+                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetLCD = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetLCD->setValue("SET LCD WITH CMD");
+  mCharMiscSetLCD->addDescriptor(mDescMiscSetLCD);
+  mCharMiscSetLCD->setCallbacks(new MyMiscSetLCDCallbacks());
 
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
