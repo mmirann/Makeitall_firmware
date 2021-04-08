@@ -145,13 +145,21 @@ class MyMiscSetBUZZERCallbacks: public BLECharacteristicCallbacks {
       int note = value[1];
       int beats = value[2];
       int duration = 2000 / beats;
+      unsigned long beepTime = 0;
 
       ledcSetup(analogChannel[analog_cnt], 5000, 8);
       ledcAttachPin(pin, analogChannel[analog_cnt]);
+        // if (millis() - beepTime >= duration) {
+        //   beepTime = millis();
+      ledcWrite(analogChannel[analog_cnt], 0);
       ledcWriteTone(analogChannel[analog_cnt], note);
-      delay(1000); //동안 재생
-      ledcWriteTone(analogChannel[analog_cnt], 0);
-      delay(10);
+      delay(beats*1000);
+      ledcWrite(analogChannel[analog_cnt], 0);
+
+        // }
+      // delay(1000); //동안 재생
+      // ledcWriteTone(analogChannel[analog_cnt], 0);
+      // delay(10);
 
       analog_cnt >= 12 ? analog_cnt = 0 : analog_cnt++;
 
