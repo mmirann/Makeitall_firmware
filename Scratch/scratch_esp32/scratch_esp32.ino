@@ -5,6 +5,7 @@
 #include <Wire.h>
 #include <Adafruit_NeoPixel.h>
 #include <LiquidCrystal_I2C.h>
+#include <Adafruit_SSD1306.h>
 
 
 #define SET_SERVICE_UUID     "c005"
@@ -12,10 +13,14 @@
 #define SET_PIN_UUID "d895d7cc-902e-11eb-a8b3-0242ac130003"
 #define SET_BUZZER_UUID "d895d952-902e-11eb-a8b3-0242ac130003"
 #define SET_LCD_UUID "d895dc2c-902e-11eb-a8b3-0242ac130003"
+#define SET_OLED_UUID "d895dd30-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
 #define GET_BUTTON_UUID      "d895d704-902e-11eb-a8b3-0242ac130003"
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
 
 char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
 
@@ -40,10 +45,15 @@ BLECharacteristic *mCharSensorAllData = NULL;
 //SENSOR
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(4, 2, NEO_GRB + NEO_KHZ800);
+Adafruit_SSD1306 display_oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
 int analogChannel[12] = {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13};
 int analog_cnt = 0;
 int servoChannel[4] = {6, 7, 14, 15};
 int servo_cnt = 0;
+
+int oled_text_size = 1;
+int oled_text_color = 0;
 
 class MyBLEServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -58,9 +68,8 @@ class MyBLEServerCallbacks: public BLEServerCallbacks {
 /*
   0. init: cmd, pin, led_num
   1. brightness: cmd, pin, brightness
-  2. clear_all: cmd, pin
-  3. no_color: cmd, pin, r, g, b, num
-  4. all_color: cmd, pin, r, g, b
+  2. no_color: cmd, pin, r, g, b, num
+  3. all_color: cmd, pin, r, g, b
 */
 class MyMiscSetNEOCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
@@ -79,24 +88,23 @@ class MyMiscSetNEOCallbacks: public BLECharacteristicCallbacks {
         int brightness = value[2];
         strip.setBrightness(brightness);
 
-      } else if (cmd == 2) { //clear
-        strip.clear();
-        strip.show();
       } else {
         int r = value[2];
         int g = value[3];
         int b = value[4];
 
-        if (cmd == 3) { // num color
+        if (cmd == 2) { // num color
           int num = value[5];
           strip.setPixelColor(num, r, g, b);
           strip.show();
-        } else if (cmd == 4) { //all color
+          strip.show();
+
+        } else if (cmd == 3) { //all color
 
           for (int i = 0; i < led_num; i++)
             strip.setPixelColor(i, r, g, b);
           strip.show();
-
+          strip.show();
         }
       }
     }
@@ -159,7 +167,7 @@ class MyMiscSetBUZZERCallbacks: public BLECharacteristicCallbacks {
 class MyMiscSetLCDCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
-      String str="";
+      String str = "";
       int cmd = value[0];
 
       if (cmd == 0) {
@@ -169,19 +177,56 @@ class MyMiscSetLCDCallbacks: public BLECharacteristicCallbacks {
         lcd.init();
         lcd.backlight();
         lcd.clear();
-        
+
       } else if (cmd == 1) {
         lcd.clear();
 
       } else if (cmd == 2) {
         int column = value[1];
         int row = value[2];
-        int textLen=value[3];
-        for(int i=4;i<4+textLen;i++){
-          str+=(char)value[i];
+        int textLen = value[3];
+        for (int i = 4; i < 4 + textLen; i++) {
+          str += (char)value[i];
         }
         lcd.setCursor(column, row);
         lcd.print(str);
+      }
+    }
+};
+
+// 0: print, 1: clear
+// 2: text theme(size, color)
+// 3: text (column, row, textLen, str)
+class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      String str = "";
+      int cmd = value[0];
+
+      if (cmd == 0) {
+        display_oled.display();
+      } else if (cmd == 1) {
+        display_oled.clearDisplay();
+        display_oled.display();
+
+      } else if (cmd == 2) {
+        oled_text_size = value[1];
+        oled_text_color = value[2];
+
+      } else if (cmd == 3) {
+        int column = value[1];
+        int row = value[2];
+        int textLen = value[3];
+        for (int i = 4; i < 4 + textLen; i++) {
+          str += (char)value[i];
+        }
+        display_oled.setTextSize(oled_text_size);
+        if (oled_text_color == 0)
+          display_oled.setTextColor(WHITE);
+        else if (oled_text_color == 1)
+          display_oled.setTextColor(BLACK, WHITE);
+        display_oled.setCursor(column, row);
+        display_oled.println(str);
       }
     }
 };
@@ -248,6 +293,13 @@ void setup() {
   mCharMiscSetLCD->addDescriptor(mDescMiscSetLCD);
   mCharMiscSetLCD->setCallbacks(new MyMiscSetLCDCallbacks());
 
+  BLECharacteristic *mCharMiscSetOLED = mServiceMisc->createCharacteristic(
+                                          SET_OLED_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetOLED = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetOLED->setValue("SET OLED WITH CMD");
+  mCharMiscSetOLED->addDescriptor(mDescMiscSetOLED);
+  mCharMiscSetOLED->setCallbacks(new MyMiscSetOLEDCallbacks());
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
                           MISC_CHARACTERISTIC_STATUS_INFO_UUID,
