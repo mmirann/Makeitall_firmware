@@ -6,6 +6,8 @@
 #include <Adafruit_NeoPixel.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_GFX.h>
+
 
 
 #define SET_SERVICE_UUID     "c005"
@@ -54,6 +56,7 @@ int servo_cnt = 0;
 
 int oled_text_size = 1;
 int oled_text_color = 0;
+bool isStartOled = false;
 
 class MyBLEServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -190,6 +193,8 @@ class MyMiscSetLCDCallbacks: public BLECharacteristicCallbacks {
         }
         lcd.setCursor(column, row);
         lcd.print(str);
+        Serial.print(str);
+
       }
     }
 };
@@ -202,6 +207,12 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
       std::string value = pCharacteristic->getValue();
       String str = "";
       int cmd = value[0];
+      if (!isStartOled)
+      {
+        display_oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+        display_oled.clearDisplay();
+        isStartOled = true;
+      }
 
       if (cmd == 0) {
         display_oled.display();
@@ -217,9 +228,14 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
         int column = value[1];
         int row = value[2];
         int textLen = value[3];
+        Serial.println(column);
+        Serial.println(row);
+        Serial.println(textLen);
         for (int i = 4; i < 4 + textLen; i++) {
           str += (char)value[i];
         }
+        Serial.println(str);
+
         display_oled.setTextSize(oled_text_size);
         if (oled_text_color == 0)
           display_oled.setTextColor(WHITE);
@@ -227,6 +243,8 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
           display_oled.setTextColor(BLACK, WHITE);
         display_oled.setCursor(column, row);
         display_oled.println(str);
+        Serial.println(str);
+
       }
     }
 };
