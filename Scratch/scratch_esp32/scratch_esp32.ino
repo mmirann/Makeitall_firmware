@@ -30,8 +30,8 @@ char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
 
 uint8_t value_misc_status_info[4] = {0, 0, 0, 0};
 
-int digital_value = 0;
-int analog_value = 0;
+uint8_t digital_value = 0;
+uint16_t analog_value = 0;
 uint8_t dht_value[2] = {0, 0};
 int ultrasonic_value = 0;
 int gyro_value[3] = {0, 0, 0};
@@ -39,7 +39,7 @@ int touch_value = 0;
 int button_value = 0;
 int buttonpu_value = 0;
 
-uint8_t value_sensor_all_data[30] = {0, };
+uint16_t value_sensor_all_data[30] = {0, };
 
 uint8_t status_led_count = 0;
 uint8_t status_update_info_count = 0;
@@ -265,19 +265,97 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
 class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
-      if (value[0] == 2) {
+      int cmd = value[0];
+
+      if (cmd == 0) {
+        pinMode(value[1], INPUT);
+        digital_value = digitalRead(value[1]);
+      } else if (cmd == 1) {
+        analog_value = analogRead(value[1]);
+      }
+      else if (cmd == 2) {
         dht myDHT11;
         myDHT11.read11(value[1]);
         dht_value[0] = myDHT11.temperature;
         dht_value[1] = myDHT11.humidity;
         Serial.println(dht_value[0]);
         Serial.println(dht_value[1]);
-      }
+
+      } else if (cmd == 3) {
+        digitalWrite(value[1], LOW);
+        delayMicroseconds(2);
+        digitalWrite(value[1], HIGH);
+        delayMicroseconds(10);
+        digitalWrite(value[1], LOW);
+
+        ultrasonic_value = pulseIn(value[2], HIGH, 30000) / 29.0 / 2.0;
+
+      } else if (cmd == 4) {
+        Wire.beginTransmission(0b1101000); //I2C address of the MPU
+        Wire.write(0x43); //Starting register for Gyro Readings
+        Wire.endTransmission();
+        Wire.requestFrom(0b1101000, 6); //Request Gyro Registers (43 - 48)
+        while (Wire.available() < 6);
+        gyroX = Wire.read() << 8 | Wire.read(); //Store first two bytes into accelX
+        gyroY = Wire.read() << 8 | Wire.read(); //Store middle two bytes into accelY
+        gyroZ = Wire.read() << 8 | Wire.read(); //Store last two bytes into accelZ
+        gyro_value[0] = gyroX / 131.0;
+        gyro_value[1] = gyroY / 131.0;
+        gyro_value[2] = gyroZ / 131.0;
+
+      } else if (cmd == 5) {
+        switch (value[1])
+        {
+          case 2:
+            tp = touchRead(T2);
+            break;
+          case 13:
+            tp = touchRead(T4);
+            break;
+          case 14:
+            tp = touchRead(T6);
+            break;
+          case 15:
+            tp = touchRead(T3);
+            break;
+          case 32:
+            tp = touchRead(T9);
+            break;
+          case 33:
+            tp = touchRead(T8);
+            break;
+        }
+
+      }else if(cmd==6){
+        pinMode(value[1], INPUT_PULLUP);
+        button_value=1;
+        }else if(cmd==7){ //button 
+         pinMode(value[1], INPUT_PULLUP);
+        }
+         if (digitalRead(value[1]) == 0) {
+           button_value=1;
+           }else {
+             button_value=0;
+           }
 
     }
 };
 
-
+void setupMPU()
+{
+  Wire.beginTransmission(0b1101000); //This is the I2C address of the MPU (b1101000/b1101001 for AC0 low/high datasheet sec. 9.2)
+  Wire.write(0x6B);                  //Accessing the register 6B - Power Management (Sec. 4.28)
+  Wire.write(0b00000000);            //Setting SLEEP register to 0. (Required; see Note on p. 9)
+  Wire.endTransmission();
+  Wire.beginTransmission(0b1101000); //I2C address of the MPU
+  Wire.write(0x1B);                  //Accessing the register 1B - Gyroscope Configuration (Sec. 4.4)
+  Wire.write(0x00000000);            //Setting the gyro to full scale +/- 250deg./s
+  Wire.endTransmission();
+  Wire.beginTransmission(0b1101000); //I2C address of the MPU
+  Wire.write(0x1C);                  //Accessing the register 1C - Acccelerometer Configuration (Sec. 4.5)
+  Wire.write(0b00000000);            //Setting the accel to +/- 2g
+  Wire.endTransmission();
+}
 
 
 void setup() {
@@ -458,13 +536,13 @@ void loop() {
     if (digitalRead(2) == 0) {
       // lcd.setCursor(0,0);
       // lcd.print("push");
-      value_misc_status_info[0] = 1;
+     // value_misc_status_info[0] = 1;
     }
     else {
 
       // lcd.setCursor(0,0);
       // lcd.print("pull");
-      value_misc_status_info[0] = 0;
+     // value_misc_status_info[0] = 0;
     }
 
     //4->1
@@ -477,7 +555,9 @@ void loop() {
 
   status_update_all_count++;
   if (status_update_all_count > 5) {
-    memcpy(&value_sensor_all_data[0], value_misc_status_info, 1);
+    //memcpy(&value_sensor_all_data[0], digital_value, 1);
+    value_sensor_all_data[0] = digital_value;
+    value_sensor_all_data[1] = analog_value;
     memcpy(&value_sensor_all_data[2], dht_value, 2);
 
     // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
