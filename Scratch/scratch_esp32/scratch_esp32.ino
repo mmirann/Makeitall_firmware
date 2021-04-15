@@ -7,6 +7,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
+#include "dht.h"
 
 
 
@@ -16,6 +17,7 @@
 #define SET_BUZZER_UUID "d895d952-902e-11eb-a8b3-0242ac130003"
 #define SET_LCD_UUID "d895dc2c-902e-11eb-a8b3-0242ac130003"
 #define SET_OLED_UUID "d895dd30-902e-11eb-a8b3-0242ac130003"
+#define SET_PORT_UUID "d895ddee-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
@@ -27,6 +29,16 @@
 char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
 
 uint8_t value_misc_status_info[4] = {0, 0, 0, 0};
+
+int digital_value = 0;
+int analog_value = 0;
+uint8_t dht_value[2] = {0, 0};
+int ultrasonic_value = 0;
+int gyro_value[3] = {0, 0, 0};
+int touch_value = 0;
+int button_value = 0;
+int buttonpu_value = 0;
+
 uint8_t value_sensor_all_data[30] = {0, };
 
 uint8_t status_led_count = 0;
@@ -248,6 +260,23 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
       }
     }
 };
+//0: digital 1: analog 2:dht 3:ultrasonic 4:gyro
+//  5:touch 6:button 7:button-pu
+class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+      if (value[0] == 2) {
+        dht myDHT11;
+        myDHT11.read11(value[1]);
+        dht_value[0] = myDHT11.temperature;
+        dht_value[1] = myDHT11.humidity;
+        Serial.println(dht_value[0]);
+        Serial.println(dht_value[1]);
+      }
+
+    }
+};
+
 
 
 
@@ -318,6 +347,14 @@ void setup() {
   mDescMiscSetOLED->setValue("SET OLED WITH CMD");
   mCharMiscSetOLED->addDescriptor(mDescMiscSetOLED);
   mCharMiscSetOLED->setCallbacks(new MyMiscSetOLEDCallbacks());
+
+  BLECharacteristic *mCharMiscSetPORT = mServiceMisc->createCharacteristic(
+                                          SET_PORT_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetPORT = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetPORT->setValue("SET PORT WITH CMD");
+  mCharMiscSetPORT->addDescriptor(mDescMiscSetOLED);
+  mCharMiscSetPORT->setCallbacks(new MyMiscSetPORTCallbacks());
   // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
                           MISC_CHARACTERISTIC_STATUS_INFO_UUID,
@@ -441,11 +478,13 @@ void loop() {
   status_update_all_count++;
   if (status_update_all_count > 5) {
     memcpy(&value_sensor_all_data[0], value_misc_status_info, 1);
+    memcpy(&value_sensor_all_data[2], dht_value, 2);
+
     // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
     // memcpy(&value_sensor_all_data[8], value_sensor_distance_sensors, 4);
     // memcpy(&value_sensor_all_data[12], value_sensor_imu_sensor, 18);
     //30->1
-    mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 1);
+    mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 30);
     if (device_connected) {
       mCharSensorAllData->notify();
     }
