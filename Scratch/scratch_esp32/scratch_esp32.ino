@@ -32,14 +32,14 @@ uint8_t value_misc_status_info[4] = {0, 0, 0, 0};
 
 uint8_t digital_value = 0;
 uint16_t analog_value = 0;
-uint8_t dht_value[2] = {0, 0};
+float dht_value[2] = {0, 0};
 int ultrasonic_value = 0;
 int gyro_value[3] = {0, 0, 0};
 int touch_value = 0;
 int button_value = 0;
 int buttonpu_value = 0;
 
-uint16_t value_sensor_all_data[30] = {0, };
+uint8_t value_sensor_all_data[30] = {0, };
 
 uint8_t status_led_count = 0;
 uint8_t status_update_info_count = 0;
@@ -69,6 +69,16 @@ int servo_cnt = 0;
 int oled_text_size = 1;
 int oled_text_color = 0;
 bool isStartOled = false;
+
+long gyroX, gyroY, gyroZ;
+
+
+union
+{
+    uint8_t intVal[4];
+    float floatVal;
+} val;
+
 
 class MyBLEServerCallbacks: public BLEServerCallbacks {
     void onConnect(BLEServer* pServer) {
@@ -304,39 +314,35 @@ class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
         gyro_value[2] = gyroZ / 131.0;
 
       } else if (cmd == 5) {
-        switch (value[1])
+        int touchPin=value[1];
+        switch (touchPin)
         {
           case 2:
-            tp = touchRead(T2);
+            touchPin = touchRead(T2);
             break;
           case 13:
-            tp = touchRead(T4);
+            touchPin = touchRead(T4);
             break;
           case 14:
-            tp = touchRead(T6);
+            touchPin = touchRead(T6);
             break;
           case 15:
-            tp = touchRead(T3);
+            touchPin = touchRead(T3);
             break;
           case 32:
-            tp = touchRead(T9);
+            touchPin = touchRead(T9);
             break;
           case 33:
-            tp = touchRead(T8);
+            touchPin = touchRead(T8);
             break;
         }
-
-      }else if(cmd==6){
+      } else if (cmd == 6) {
+        pinMode(value[1], INPUT);
+        button_value = digitalRead(value[1]);
+      } else if (cmd == 7) { //button
         pinMode(value[1], INPUT_PULLUP);
-        button_value=1;
-        }else if(cmd==7){ //button 
-         pinMode(value[1], INPUT_PULLUP);
-        }
-         if (digitalRead(value[1]) == 0) {
-           button_value=1;
-           }else {
-             button_value=0;
-           }
+        button_value = !digitalRead(value[1]);
+      }
 
     }
 };
@@ -536,13 +542,13 @@ void loop() {
     if (digitalRead(2) == 0) {
       // lcd.setCursor(0,0);
       // lcd.print("push");
-     // value_misc_status_info[0] = 1;
+      // value_misc_status_info[0] = 1;
     }
     else {
 
       // lcd.setCursor(0,0);
       // lcd.print("pull");
-     // value_misc_status_info[0] = 0;
+      // value_misc_status_info[0] = 0;
     }
 
     //4->1
@@ -557,8 +563,12 @@ void loop() {
   if (status_update_all_count > 5) {
     //memcpy(&value_sensor_all_data[0], digital_value, 1);
     value_sensor_all_data[0] = digital_value;
-    value_sensor_all_data[1] = analog_value;
-    memcpy(&value_sensor_all_data[2], dht_value, 2);
+    value_sensor_all_data[1]= analog_value;
+    value_sensor_all_data[2]= analog_value>>8;
+    val.floatVal=dht_value[0];
+    memcpy(&value_sensor_all_data[3], val.intVal, 4);
+     val.floatVal=dht_value[1];
+    memcpy(&value_sensor_all_data[7], val.intVal, 4);
 
     // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
     // memcpy(&value_sensor_all_data[8], value_sensor_distance_sensors, 4);
