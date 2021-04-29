@@ -41,8 +41,6 @@
 #define PULSEIN 6
 #define ULTRASONIC 7
 #define TIMER 8
-#define READ_BLUETOOTH 9
-#define WRITE_BLUETOOTH 10
 #define LCD 11
 #define LCDCLEAR 12
 #define DCMOTOR 14
@@ -212,7 +210,6 @@ boolean isDHTtemp = false;
 boolean isLoad = false;
 boolean isRFID = false;
 boolean isRFIDtap = false;
-boolean isBluetooth = false;
 
 // End Public Value
 
@@ -440,40 +437,6 @@ void parseData()
         else if (port == trigPin || port == echoPin)
         { //12,13번 포트를 사용하지만 초음파 센서가 아닌 경우
             setUltrasonicMode(false);
-            digitals[port] = 0;
-        }
-        else if (device == READ_BLUETOOTH)
-        {
-            softSerial.begin(9600);
-            digitals[softSerialTX] = 1;
-            digitals[softSerialRX] = 1;
-            pinMode(softSerialRX, INPUT);
-            if (!isBluetooth)
-            {
-                setBluetoothMode(true);
-            }
-        }
-        else if (device == WRITE_BLUETOOTH)
-        {
-            softSerial.begin(9600);
-            digitals[softSerialTX] = 1;
-            digitals[softSerialRX] = 1;
-            pinMode(softSerialTX, OUTPUT);
-            if (!isBluetooth)
-            {
-                setBluetoothMode(true);
-            }
-        }
-        else if (device != READ_BLUETOOTH && port == softSerialRX)
-        {
-            softSerial.end();
-            setBluetoothMode(false);
-            digitals[port] = 0;
-        }
-        else if (device != WRITE_BLUETOOTH && port == softSerialTX)
-        {
-            softSerial.end();
-            setBluetoothMode(false);
             digitals[port] = 0;
         }
         else
@@ -1251,30 +1214,6 @@ void runModule(int device)
         lcd.print(txt);
     }
     break;
-    case WRITE_BLUETOOTH:
-    {
-        // int arrayNum = 7;
-        // for (int i = 0; i < 17; i++)
-        // {
-        //     softSerialTemp[i] = readBuffer(arrayNum);
-        //     arrayNum += 2;
-        // }
-
-        int len = readBuffer(7);
-        String txt = readString(len, 9);
-        char softSerialTemp[len];
-
-        for (int i = 0; i < len; i++)
-            softSerialTemp[i] = txt[i];
-
-        lcd.init();
-        lcd.setCursor(0, 0);
-        lcd.print("WRITE BLUETOOTH");
-        lcd.setCursor(0, 1);
-        lcd.print(softSerialTemp);
-        softSerial.write(softSerialTemp);
-    }
-    break;
     default:
         break;
     }
@@ -1353,28 +1292,6 @@ void setUltrasonicMode(boolean mode)
     }
 }
 
-void setBluetoothMode(boolean mode)
-{
-    isBluetooth = mode;
-    if (!mode)
-    {
-        makeBtString = "";
-    }
-}
-
-void sendBluetooth()
-{
-    lcd.init();
-    lcd.setCursor(0, 0);
-    lcd.print("SendBluetooth");
-    lcd.setCursor(0, 1);
-    lcd.print(makeBtString);
-    writeHead();
-    sendString(makeBtString);
-    writeSerial(softSerialRX);
-    writeSerial(READ_BLUETOOTH);
-    writeEnd();
-}
 void sendDHT()
 {
     myDHT11.read11(dhtPin);

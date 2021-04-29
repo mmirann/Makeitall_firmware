@@ -17,10 +17,19 @@
 #define SET_BUZZER_UUID "d895d952-902e-11eb-a8b3-0242ac130003"
 #define SET_LCD_UUID "d895dc2c-902e-11eb-a8b3-0242ac130003"
 #define SET_OLED_UUID "d895dd30-902e-11eb-a8b3-0242ac130003"
-#define SET_PORT_UUID "d895ddee-902e-11eb-a8b3-0242ac130003"
+//#define SET_PORT_UUID "d895ddee-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
+#define SET_DIGITAL_UUID "d895dea2-902e-11eb-a8b3-0242ac130003"
+#define    SET_ANALOG_UUID "7afd83e8-a335-11eb-bcbc-0242ac130002"
+ #define   SET_ULTRASONIC_UUID "7afd7d76-a335-11eb-bcbc-0242ac130002"
+#define    SET_DHT_UUID "7afd84b0-a335-11eb-bcbc-0242ac130002"
+ #define   SET_GYRO_UUID "7afd8564-a335-11eb-bcbc-0242ac130002"
+#define    SET_TOUCH_UUID "7afd7f88-a335-11eb-bcbc-0242ac130002"
+#define    SET_BUTTON_UUID "7afd8078-a335-11eb-bcbc-0242ac130002"
+#define SET_BUTTON_PU_UUID "7afd8140-a335-11eb-bcbc-0242ac130002"
+//#define    get_value: "d895d704-902e-11eb-a8b3-0242ac130003"
 #define GET_BUTTON_UUID      "d895d704-902e-11eb-a8b3-0242ac130003"
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -132,6 +141,7 @@ class MyMiscSetNEOCallbacks: public BLECharacteristicCallbacks {
           strip.show();
         }
       }
+    Serial.println("NEOPIXEL");
     }
 };
 
@@ -272,26 +282,30 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
 };
 //0: digital 1: analog 2:dht 3:ultrasonic 4:gyro
 //  5:touch 6:button 7:button-pu
-class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
+class MyMiscSetDigitalCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+    
+        pinMode(value[1], INPUT);
+        digital_value = digitalRead(value[1]);
+    }
+};
+
+class MyMiscSetAnalogCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
       int cmd = value[0];
 
-      if (cmd == 0) {
-        pinMode(value[1], INPUT);
-        digital_value = digitalRead(value[1]);
-      } else if (cmd == 1) {
         analog_value = analogRead(value[1]);
-      }
-      else if (cmd == 2) {
-        dht myDHT11;
-        myDHT11.read11(value[1]);
-        dht_value[0] = myDHT11.temperature;
-        dht_value[1] = myDHT11.humidity;
-        Serial.println(dht_value[0]);
-        Serial.println(dht_value[1]);
+        Serial.println(analog_value);
+    }
+  
+};
 
-      } else if (cmd == 3) {
+class MyMiscSetUltrasonicCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+
         digitalWrite(value[1], LOW);
         delayMicroseconds(2);
         digitalWrite(value[1], HIGH);
@@ -299,8 +313,29 @@ class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
         digitalWrite(value[1], LOW);
 
         ultrasonic_value = pulseIn(value[2], HIGH, 30000) / 29.0 / 2.0;
+    }
 
-      } else if (cmd == 4) {
+};
+
+class MyMiscSetDhtCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+     
+        dht myDHT11;
+        myDHT11.read11(value[1]);
+        dht_value[0] = myDHT11.temperature;
+        dht_value[1] = myDHT11.humidity;
+        Serial.println(dht_value[0]);
+        Serial.println(dht_value[1]);
+
+    }
+
+};
+
+class MyMiscSetGyroCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+     
         Wire.beginTransmission(0b1101000); //I2C address of the MPU
         Wire.write(0x43); //Starting register for Gyro Readings
         Wire.endTransmission();
@@ -312,8 +347,13 @@ class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
         gyro_value[0] = gyroX / 131.0;
         gyro_value[1] = gyroY / 131.0;
         gyro_value[2] = gyroZ / 131.0;
+    }
 
-      } else if (cmd == 5) {
+};
+class MyMiscSetTouchCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+     
         int touchPin=value[1];
         switch (touchPin)
         {
@@ -336,16 +376,25 @@ class MyMiscSetPORTCallbacks: public BLECharacteristicCallbacks {
             touchPin = touchRead(T8);
             break;
         }
-      } else if (cmd == 6) {
-        pinMode(value[1], INPUT);
-        button_value = digitalRead(value[1]);
-      } else if (cmd == 7) { //button
+        }
+  
+};
+class MyMiscSetButtonCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+     
+        pinMode(value[1], INPUT);}
+    
+};
+class MyMiscSetbutton_puCallbacks: public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) {
+      std::string value = pCharacteristic->getValue();
+   
         pinMode(value[1], INPUT_PULLUP);
-        button_value = !digitalRead(value[1]);
-      }
-
+        buttonpu_value = !digitalRead(value[1]);
     }
 };
+
 
 void setupMPU()
 {
@@ -388,7 +437,7 @@ void setup() {
   //************************************************
 
   // Misc Service
-  BLEService *mServiceMisc = mServer->createService(BLEUUID(SET_SERVICE_UUID), 20);
+  BLEService *mServiceMisc = mServer->createService(BLEUUID(SET_SERVICE_UUID), 40);
 
   // SET PIN
   BLECharacteristic *mCharMiscSetPIN = mServiceMisc->createCharacteristic(
@@ -432,14 +481,71 @@ void setup() {
   mCharMiscSetOLED->addDescriptor(mDescMiscSetOLED);
   mCharMiscSetOLED->setCallbacks(new MyMiscSetOLEDCallbacks());
 
-  BLECharacteristic *mCharMiscSetPORT = mServiceMisc->createCharacteristic(
-                                          SET_PORT_UUID,
+  BLECharacteristic *mCharMiscSetDigital = mServiceMisc->createCharacteristic(
+                                          SET_DIGITAL_UUID,
                                           BLECharacteristic::PROPERTY_WRITE_NR);
-  BLEDescriptor *mDescMiscSetPORT = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  mDescMiscSetPORT->setValue("SET PORT WITH CMD");
-  mCharMiscSetPORT->addDescriptor(mDescMiscSetOLED);
-  mCharMiscSetPORT->setCallbacks(new MyMiscSetPORTCallbacks());
-  // Status Information
+  BLEDescriptor *mDescMiscSetDigital = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetDigital->setValue("SET Digital WITH CMD");
+  mCharMiscSetDigital->addDescriptor(mDescMiscSetDigital);
+  mCharMiscSetDigital->setCallbacks(new MyMiscSetDigitalCallbacks());
+
+    BLECharacteristic *mCharMiscSetAnalog = mServiceMisc->createCharacteristic(
+                                          SET_ANALOG_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetAnalog = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetAnalog->setValue("SET Analog WITH CMD");
+  mCharMiscSetAnalog->addDescriptor(mDescMiscSetAnalog);
+  mCharMiscSetAnalog->setCallbacks(new MyMiscSetAnalogCallbacks());
+
+    BLECharacteristic *mCharMiscSetDht = mServiceMisc->createCharacteristic(
+                                          SET_DHT_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetDht = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetDht->setValue("SET Dht WITH CMD");
+  mCharMiscSetDht->addDescriptor(mDescMiscSetDht);
+  mCharMiscSetDht->setCallbacks(new MyMiscSetDhtCallbacks());
+
+  //   BLECharacteristic *mCharMiscSetUltrasonic = mServiceMisc->createCharacteristic(
+  //                                         SET_ULTRASONIC_UUID,
+  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  // BLEDescriptor *mDescMiscSetUltrasonic = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  // mDescMiscSetUltrasonic->setValue("SET Ultrasonic WITH CMD");
+  // mCharMiscSetUltrasonic->addDescriptor(mDescMiscSetUltrasonic);
+  // mCharMiscSetUltrasonic->setCallbacks(new MyMiscSetUltrasonicCallbacks());
+
+
+  //   BLECharacteristic *mCharMiscSetGyro = mServiceMisc->createCharacteristic(
+  //                                         SET_GYRO_UUID,
+  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  // BLEDescriptor *mDescMiscSetGyro = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  // mDescMiscSetGyro->setValue("SET Gyro WITH CMD");
+  // mCharMiscSetGyro->addDescriptor(mDescMiscSetGyro);
+  // mCharMiscSetGyro->setCallbacks(new MyMiscSetGyroCallbacks());
+
+  //   BLECharacteristic *mCharMiscSetTouch = mServiceMisc->createCharacteristic(
+  //                                         SET_TOUCH_UUID,
+  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  // BLEDescriptor *mDescMiscSetTouch = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  // mDescMiscSetTouch->setValue("SET Touch WITH CMD");
+  // mCharMiscSetTouch->addDescriptor(mDescMiscSetTouch);
+  // mCharMiscSetTouch->setCallbacks(new MyMiscSetTouchCallbacks());
+
+  //   BLECharacteristic *mCharMiscSetButton = mServiceMisc->createCharacteristic(
+  //                                         SET_BUTTON_UUID,
+  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  // BLEDescriptor *mDescMiscSetButton = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  // mDescMiscSetButton->setValue("SET Button WITH CMD");
+  // mCharMiscSetButton->addDescriptor(mDescMiscSetButton);
+  // mCharMiscSetButton->setCallbacks(new MyMiscSetButtonCallbacks());
+
+  //   BLECharacteristic *mCharMiscSetbutton_pu = mServiceMisc->createCharacteristic(
+  //                                         SET_BUTTON_PU_UUID,
+  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
+  // BLEDescriptor *mDescMiscSetbutton_pu = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  // mDescMiscSetbutton_pu->setValue("SET button_pu WITH CMD");
+  // mCharMiscSetbutton_pu->addDescriptor(mDescMiscSetbutton_pu);
+  // mCharMiscSetbutton_pu->setCallbacks(new MyMiscSetbutton_puCallbacks());
+  // // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
                           MISC_CHARACTERISTIC_STATUS_INFO_UUID,
                           BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
