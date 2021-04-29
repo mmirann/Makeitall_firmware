@@ -42,7 +42,7 @@ uint8_t value_misc_status_info[4] = {0, 0, 0, 0};
 uint8_t digital_value = 0;
 uint16_t analog_value = 0;
 float dht_value[2] = {0, 0};
-int ultrasonic_value = 0;
+float ultrasonic_value = 0;
 int gyro_value[3] = {0, 0, 0};
 int touch_value = 0;
 int button_value = 0;
@@ -305,14 +305,19 @@ class MyMiscSetAnalogCallbacks: public BLECharacteristicCallbacks {
 class MyMiscSetUltrasonicCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
+      int trigPin=value[1];
+      int echoPin=value[2];
+       pinMode(trigPin, OUTPUT);
+        pinMode(echoPin, INPUT);
 
-        digitalWrite(value[1], LOW);
+        digitalWrite(trigPin, LOW);
         delayMicroseconds(2);
-        digitalWrite(value[1], HIGH);
+        digitalWrite(trigPin, HIGH);
         delayMicroseconds(10);
-        digitalWrite(value[1], LOW);
+        digitalWrite( echoPin, LOW);
 
-        ultrasonic_value = pulseIn(value[2], HIGH, 30000) / 29.0 / 2.0;
+        ultrasonic_value = pulseIn( echoPin, HIGH, 30000) / 29.0 / 2.0;
+        Serial.println(ultrasonic_value);
     }
 
 };
@@ -505,13 +510,13 @@ void setup() {
   mCharMiscSetDht->addDescriptor(mDescMiscSetDht);
   mCharMiscSetDht->setCallbacks(new MyMiscSetDhtCallbacks());
 
-  //   BLECharacteristic *mCharMiscSetUltrasonic = mServiceMisc->createCharacteristic(
-  //                                         SET_ULTRASONIC_UUID,
-  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
-  // BLEDescriptor *mDescMiscSetUltrasonic = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  // mDescMiscSetUltrasonic->setValue("SET Ultrasonic WITH CMD");
-  // mCharMiscSetUltrasonic->addDescriptor(mDescMiscSetUltrasonic);
-  // mCharMiscSetUltrasonic->setCallbacks(new MyMiscSetUltrasonicCallbacks());
+    BLECharacteristic *mCharMiscSetUltrasonic = mServiceMisc->createCharacteristic(
+                                          SET_ULTRASONIC_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetUltrasonic = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetUltrasonic->setValue("SET Ultrasonic WITH CMD");
+  mCharMiscSetUltrasonic->addDescriptor(mDescMiscSetUltrasonic);
+  mCharMiscSetUltrasonic->setCallbacks(new MyMiscSetUltrasonicCallbacks());
 
 
   //   BLECharacteristic *mCharMiscSetGyro = mServiceMisc->createCharacteristic(
@@ -633,30 +638,6 @@ void loop() {
   status_update_info_count++;
   if (status_update_info_count > 5) {
 
-    // value_misc_status_info[0] = (uint8_t)edubot.motor.isBusy();
-
-
-    // value_misc_status_info[1] = edubot.batteryGetVoltage();
-    // if(value_misc_status_info[1] < 32) {
-    //   value_misc_status_info[2] = 1;
-    // }
-    // else {
-    //   value_misc_status_info[2] = 0;
-    // }
-    pinMode(2, INPUT_PULLUP);
-
-    if (digitalRead(2) == 0) {
-      // lcd.setCursor(0,0);
-      // lcd.print("push");
-      // value_misc_status_info[0] = 1;
-    }
-    else {
-
-      // lcd.setCursor(0,0);
-      // lcd.print("pull");
-      // value_misc_status_info[0] = 0;
-    }
-
     //4->1
     mCharMiscStatusInfo->setValue((uint8_t*)&value_misc_status_info, 1);
     if (device_connected) {
@@ -675,7 +656,8 @@ void loop() {
     memcpy(&value_sensor_all_data[3], val.intVal, 4);
      val.floatVal=dht_value[1];
     memcpy(&value_sensor_all_data[7], val.intVal, 4);
-
+    val.floatVal=ultrasonic_value;
+    memcpy(&value_sensor_all_data[11], val.intVal, 4);
     // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
     // memcpy(&value_sensor_all_data[8], value_sensor_distance_sensors, 4);
     // memcpy(&value_sensor_all_data[12], value_sensor_imu_sensor, 18);
