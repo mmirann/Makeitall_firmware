@@ -358,27 +358,23 @@ class MyMiscSetGyroCallbacks: public BLECharacteristicCallbacks {
 class MyMiscSetTouchCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
-     
         int touchPin=value[1];
         switch (touchPin)
         {
-          case 2:
-            touchPin = touchRead(T2);
+          case 4:
+            touch_value = touchRead(T0);
             break;
           case 13:
-            touchPin = touchRead(T4);
+           touch_value  = touchRead(T4);
             break;
           case 14:
-            touchPin = touchRead(T6);
-            break;
-          case 15:
-            touchPin = touchRead(T3);
+            touch_value  = touchRead(T6);
             break;
           case 32:
-            touchPin = touchRead(T9);
+            touch_value  = touchRead(T9);
             break;
           case 33:
-            touchPin = touchRead(T8);
+           touch_value  = touchRead(T8);
             break;
         }
         }
@@ -519,37 +515,37 @@ void setup() {
   mCharMiscSetUltrasonic->setCallbacks(new MyMiscSetUltrasonicCallbacks());
 
 
-  //   BLECharacteristic *mCharMiscSetGyro = mServiceMisc->createCharacteristic(
-  //                                         SET_GYRO_UUID,
-  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
-  // BLEDescriptor *mDescMiscSetGyro = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  // mDescMiscSetGyro->setValue("SET Gyro WITH CMD");
-  // mCharMiscSetGyro->addDescriptor(mDescMiscSetGyro);
-  // mCharMiscSetGyro->setCallbacks(new MyMiscSetGyroCallbacks());
+    BLECharacteristic *mCharMiscSetGyro = mServiceMisc->createCharacteristic(
+                                          SET_GYRO_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetGyro = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetGyro->setValue("SET Gyro WITH CMD");
+  mCharMiscSetGyro->addDescriptor(mDescMiscSetGyro);
+  mCharMiscSetGyro->setCallbacks(new MyMiscSetGyroCallbacks());
 
-  //   BLECharacteristic *mCharMiscSetTouch = mServiceMisc->createCharacteristic(
-  //                                         SET_TOUCH_UUID,
-  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
-  // BLEDescriptor *mDescMiscSetTouch = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  // mDescMiscSetTouch->setValue("SET Touch WITH CMD");
-  // mCharMiscSetTouch->addDescriptor(mDescMiscSetTouch);
-  // mCharMiscSetTouch->setCallbacks(new MyMiscSetTouchCallbacks());
+    BLECharacteristic *mCharMiscSetTouch = mServiceMisc->createCharacteristic(
+                                          SET_TOUCH_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetTouch = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetTouch->setValue("SET Touch WITH CMD");
+  mCharMiscSetTouch->addDescriptor(mDescMiscSetTouch);
+  mCharMiscSetTouch->setCallbacks(new MyMiscSetTouchCallbacks());
 
-  //   BLECharacteristic *mCharMiscSetButton = mServiceMisc->createCharacteristic(
-  //                                         SET_BUTTON_UUID,
-  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
-  // BLEDescriptor *mDescMiscSetButton = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  // mDescMiscSetButton->setValue("SET Button WITH CMD");
-  // mCharMiscSetButton->addDescriptor(mDescMiscSetButton);
-  // mCharMiscSetButton->setCallbacks(new MyMiscSetButtonCallbacks());
+    BLECharacteristic *mCharMiscSetButton = mServiceMisc->createCharacteristic(
+                                          SET_BUTTON_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetButton = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetButton->setValue("SET Button WITH CMD");
+  mCharMiscSetButton->addDescriptor(mDescMiscSetButton);
+  mCharMiscSetButton->setCallbacks(new MyMiscSetButtonCallbacks());
 
-  //   BLECharacteristic *mCharMiscSetbutton_pu = mServiceMisc->createCharacteristic(
-  //                                         SET_BUTTON_PU_UUID,
-  //                                         BLECharacteristic::PROPERTY_WRITE_NR);
-  // BLEDescriptor *mDescMiscSetbutton_pu = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
-  // mDescMiscSetbutton_pu->setValue("SET button_pu WITH CMD");
-  // mCharMiscSetbutton_pu->addDescriptor(mDescMiscSetbutton_pu);
-  // mCharMiscSetbutton_pu->setCallbacks(new MyMiscSetbutton_puCallbacks());
+    BLECharacteristic *mCharMiscSetbutton_pu = mServiceMisc->createCharacteristic(
+                                          SET_BUTTON_PU_UUID,
+                                          BLECharacteristic::PROPERTY_WRITE_NR);
+  BLEDescriptor *mDescMiscSetbutton_pu = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
+  mDescMiscSetbutton_pu->setValue("SET button_pu WITH CMD");
+  mCharMiscSetbutton_pu->addDescriptor(mDescMiscSetbutton_pu);
+  mCharMiscSetbutton_pu->setCallbacks(new MyMiscSetbutton_puCallbacks());
   // // Status Information
   mCharMiscStatusInfo = mServiceMisc->createCharacteristic(
                           MISC_CHARACTERISTIC_STATUS_INFO_UUID,
@@ -658,6 +654,8 @@ void loop() {
     memcpy(&value_sensor_all_data[7], val.intVal, 4);
     val.floatVal=ultrasonic_value;
     memcpy(&value_sensor_all_data[11], val.intVal, 4);
+    value_sensor_all_data[15]=touch_value;
+
     // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
     // memcpy(&value_sensor_all_data[8], value_sensor_distance_sensors, 4);
     // memcpy(&value_sensor_all_data[12], value_sensor_imu_sensor, 18);
