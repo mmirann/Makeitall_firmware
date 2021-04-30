@@ -10,26 +10,25 @@
 #include "dht.h"
 
 
+// BLUETOOTH 통신을 위해 센서 동작마다 UUID를 설정
+// 추가 UUID가 필요한 경우: https://www.uuidgenerator.net/ 접속 
 
-#define SET_SERVICE_UUID     "c005"
-#define SET_NEOPIXEL_UUID    "d895d61e-902e-11eb-a8b3-0242ac130003"
-#define SET_PIN_UUID "d895d7cc-902e-11eb-a8b3-0242ac130003"
-#define SET_BUZZER_UUID "d895d952-902e-11eb-a8b3-0242ac130003"
-#define SET_LCD_UUID "d895dc2c-902e-11eb-a8b3-0242ac130003"
-#define SET_OLED_UUID "d895dd30-902e-11eb-a8b3-0242ac130003"
-//#define SET_PORT_UUID "d895ddee-902e-11eb-a8b3-0242ac130003"
-#define MISC_CHARACTERISTIC_STATUS_INFO_UUID         "34443c3b-3356-11e9-b210-d663bd873d93"
+#define SET_SERVICE_UUID                      "c005"
+#define SET_NEOPIXEL_UUID                     "d895d61e-902e-11eb-a8b3-0242ac130003"
+#define SET_PIN_UUID                          "d895d7cc-902e-11eb-a8b3-0242ac130003"
+#define SET_BUZZER_UUID                       "d895d952-902e-11eb-a8b3-0242ac130003"
+#define SET_LCD_UUID                          "d895dc2c-902e-11eb-a8b3-0242ac130003"
+#define MISC_CHARACTERISTIC_STATUS_INFO_UUID  "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
-#define SET_DIGITAL_UUID "d895dea2-902e-11eb-a8b3-0242ac130003"
-#define    SET_ANALOG_UUID "7afd83e8-a335-11eb-bcbc-0242ac130002"
- #define   SET_ULTRASONIC_UUID "7afd7d76-a335-11eb-bcbc-0242ac130002"
-#define    SET_DHT_UUID "7afd84b0-a335-11eb-bcbc-0242ac130002"
- #define   SET_GYRO_UUID "7afd8564-a335-11eb-bcbc-0242ac130002"
-#define    SET_TOUCH_UUID "7afd7f88-a335-11eb-bcbc-0242ac130002"
-#define    SET_BUTTON_UUID "7afd8078-a335-11eb-bcbc-0242ac130002"
-#define SET_BUTTON_PU_UUID "7afd8140-a335-11eb-bcbc-0242ac130002"
-//#define    get_value: "d895d704-902e-11eb-a8b3-0242ac130003"
+#define SET_DIGITAL_UUID     "d895dea2-902e-11eb-a8b3-0242ac130003"
+#define SET_ANALOG_UUID      "7afd83e8-a335-11eb-bcbc-0242ac130002"
+#define SET_ULTRASONIC_UUID  "7afd7d76-a335-11eb-bcbc-0242ac130002"
+#define SET_DHT_UUID         "7afd84b0-a335-11eb-bcbc-0242ac130002"
+#define SET_GYRO_UUID        "7afd8564-a335-11eb-bcbc-0242ac130002"
+#define SET_TOUCH_UUID       "7afd7f88-a335-11eb-bcbc-0242ac130002"
+#define SET_BUTTON_UUID      "7afd8078-a335-11eb-bcbc-0242ac130002"
+#define SET_BUTTON_PU_UUID   "7afd8140-a335-11eb-bcbc-0242ac130002"
 #define GET_BUTTON_UUID      "d895d704-902e-11eb-a8b3-0242ac130003"
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -39,6 +38,7 @@ char ble_mac_addr[6] = {0, 0, 0, 0, 0, 0};
 
 uint8_t value_misc_status_info[4] = {0, 0, 0, 0};
 
+// get 동작 후 값을 보내기 위하여 센서별로 저장하는 변수 
 uint8_t digital_value = 0;
 uint16_t analog_value = 0;
 float dht_value[2] = {0, 0};
@@ -47,6 +47,7 @@ int gyro_value[3] = {0, 0, 0};
 int touch_value = 0;
 int button_value = 0;
 int buttonpu_value = 0;
+long gyroX, gyroY, gyroZ;
 
 uint8_t value_sensor_all_data[30] = {0, };
 
@@ -66,22 +67,26 @@ BLECharacteristic *mCharSensorAllData = NULL;
 
 //********************************************************
 //SENSOR
+
+//LCD
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+//NEOPIXEL
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(4, 2, NEO_GRB + NEO_KHZ800);
+//OLED
 Adafruit_SSD1306 display_oled(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
+//아날로그 채널 분배 
 int analogChannel[12] = {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13};
 int analog_cnt = 0;
 int servoChannel[4] = {6, 7, 14, 15};
 int servo_cnt = 0;
 
+//OLED 디폴트 셋팅 - 폰트 크기, 색상
 int oled_text_size = 1;
 int oled_text_color = 0;
 bool isStartOled = false;
 
-long gyroX, gyroY, gyroZ;
-
-
+// Float 변수를 uint8_t로 변환하기 위한 union 
 union
 {
     uint8_t intVal[4];
@@ -146,6 +151,9 @@ class MyMiscSetNEOCallbacks: public BLECharacteristicCallbacks {
 };
 
 // cmd pin value
+// analog 채널 분배를 위하여 cnt를 증가시키며 채널을 할당함
+// 서보모터와 아날로그는 해상도가 달라 동일한 타이머를 가진 채널 사용 불가능
+// 따라서 analog_channel와 servo_channel를 분리 
 class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
@@ -176,6 +184,7 @@ class MyMiscSetPINCallbacks: public BLECharacteristicCallbacks {
     }
 };
 
+// 부저와 아날로그는 동일한 해상도를 갖기 때문에 같은 채널 사용 가능 
 class MyMiscSetBUZZERCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
@@ -199,6 +208,7 @@ class MyMiscSetBUZZERCallbacks: public BLECharacteristicCallbacks {
     }
 };
 
+// [LCD] 0: INIT, 1: CLEAR, 2: PRINT
 class MyMiscSetLCDCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
@@ -280,8 +290,7 @@ class MyMiscSetOLEDCallbacks: public BLECharacteristicCallbacks {
       }
     }
 };
-//0: digital 1: analog 2:dht 3:ultrasonic 4:gyro
-//  5:touch 6:button 7:button-pu
+
 class MyMiscSetDigitalCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) {
       std::string value = pCharacteristic->getValue();
@@ -414,9 +423,10 @@ void setupMPU()
 }
 
 
+
 void setup() {
   // put your setup code here, to run once:
-  Serial.begin(115200);
+  Serial.begin(115200); //Serial 모니터의 보드레이트를 동일하게 설정 시에, 시리얼 창 확인 가능 
 
   //************lcd**************
   lcd.init();                      // initialize the lcd
@@ -437,6 +447,8 @@ void setup() {
 
   //************************************************
 
+
+  // 스크래치로부터 블루투스 UUID가 도착하면 위에서 선언한 해당하는 콜백함수를 실행함 
   // Misc Service
   BLEService *mServiceMisc = mServer->createService(BLEUUID(SET_SERVICE_UUID), 40);
 
@@ -571,7 +583,8 @@ void setup() {
                          GET_BUTTON_UUID,
                          BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
 
-  //30->1
+  //코드의 마지막 부분에서 value_sensor_all_data에 집어넣은 센서데이터 값들을 전송하는 부분
+
   mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 30);
   BLEDescriptor *mDescSensorAllData = new BLEDescriptor((uint16_t)0x2901); // Characteristic User Description
   mDescSensorAllData->setValue("Update All Data for Scratch");
@@ -603,26 +616,15 @@ void loop() {
   status_led_count++;
   if (status_led_count > 50) {
     if (device_connected) {
-      //   edubot.ledOn();
 
       if (status_text_displayed) {
-        // lcd.setCursor(0, 0);
-        // lcd.clear();
-        // lcd.print("Ready for BLE");
+
         status_text_displayed = false;
       }
     }
     else {
-      //   edubot.ledToggle();
 
       if (!status_text_displayed) {
-        // lcd.clear();
-        // lcd.setCursor(0,0);
-        // lcd.print("JIKKO");
-        //char buf[20];
-        //sprintf(buf, "%X:%X:%X:%X:%X:%X", ble_mac_addr[0], ble_mac_addr[1], ble_mac_addr[2], ble_mac_addr[3], ble_mac_addr[4], ble_mac_addr[5]);
-        //lcd.setCursor(1,0);
-        // lcd.print(std::string(buf).c_str());
         status_text_displayed = true;
       }
     }
@@ -644,22 +646,26 @@ void loop() {
 
   status_update_all_count++;
   if (status_update_all_count > 5) {
-    //memcpy(&value_sensor_all_data[0], digital_value, 1);
+
+    
     value_sensor_all_data[0] = digital_value;
+    // analog의 값은 1바이트를 초과, 0-4096을 가짐
+    // 2바이트로 나눠서 전송
     value_sensor_all_data[1]= analog_value;
     value_sensor_all_data[2]= analog_value>>8;
+    
+    //dht 온,습도와 초음파 센서는 Float이기 대문에 Union을 사용해서 uint8_t로 바꿔서 전송
     val.floatVal=dht_value[0];
     memcpy(&value_sensor_all_data[3], val.intVal, 4);
      val.floatVal=dht_value[1];
     memcpy(&value_sensor_all_data[7], val.intVal, 4);
     val.floatVal=ultrasonic_value;
     memcpy(&value_sensor_all_data[11], val.intVal, 4);
+
     value_sensor_all_data[15]=touch_value;
 
-    // memcpy(&value_sensor_all_data[4], value_sensor_floor_sensors, 4);
-    // memcpy(&value_sensor_all_data[8], value_sensor_distance_sensors, 4);
-    // memcpy(&value_sensor_all_data[12], value_sensor_imu_sensor, 18);
-    //30->1
+    // 자이로 센서  값 추가 필요
+    
     mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 30);
     if (device_connected) {
       mCharSensorAllData->notify();
