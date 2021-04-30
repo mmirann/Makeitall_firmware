@@ -11,7 +11,8 @@
 
 
 // BLUETOOTH 통신을 위해 센서 동작마다 UUID를 설정
-// 추가 UUID가 필요한 경우: https://www.uuidgenerator.net/ 접속 
+// 추가 UUID가 필요한 경우: https://www.uuidgenerator.net/ 접속
+//주석 
 
 #define SET_SERVICE_UUID                      "c005"
 #define SET_NEOPIXEL_UUID                     "d895d61e-902e-11eb-a8b3-0242ac130003"
