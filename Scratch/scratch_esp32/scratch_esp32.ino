@@ -19,6 +19,7 @@
 #define SET_PIN_UUID                          "d895d7cc-902e-11eb-a8b3-0242ac130003"
 #define SET_BUZZER_UUID                       "d895d952-902e-11eb-a8b3-0242ac130003"
 #define SET_LCD_UUID                          "d895dc2c-902e-11eb-a8b3-0242ac130003"
+#define SET_OLED_UUID                         "d895dd30-902e-11eb-a8b3-0242ac130003"
 #define MISC_CHARACTERISTIC_STATUS_INFO_UUID  "34443c3b-3356-11e9-b210-d663bd873d93"
 
 #define GET_SERVICE_UUID     "c006"
