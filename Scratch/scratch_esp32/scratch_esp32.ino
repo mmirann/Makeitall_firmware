@@ -12,7 +12,7 @@
 
 // BLUETOOTH 통신을 위해 센서 동작마다 UUID를 설정
 // 추가 UUID가 필요한 경우: https://www.uuidgenerator.net/ 접속
-//주석 
+//주석  
 
 #define SET_SERVICE_UUID                      "c005"
 #define SET_NEOPIXEL_UUID                     "d895d61e-902e-11eb-a8b3-0242ac130003"
@@ -45,11 +45,11 @@ uint8_t digital_value = 0;
 uint16_t analog_value = 0;
 float dht_value[2] = {0, 0};
 float ultrasonic_value = 0;
-int gyro_value[3] = {0, 0, 0};
+uint16_t gyro_value[3] = {0, 0, 0};
 int touch_value = 0;
 int button_value = 0;
 int buttonpu_value = 0;
-long gyroX, gyroY, gyroZ;
+float gyroX, gyroY, gyroZ;
 
 uint8_t value_sensor_all_data[30] = {0, };
 
@@ -360,9 +360,9 @@ class MyMiscSetGyroCallbacks: public BLECharacteristicCallbacks {
         gyroX = Wire.read() << 8 | Wire.read(); //Store first two bytes into accelX
         gyroY = Wire.read() << 8 | Wire.read(); //Store middle two bytes into accelY
         gyroZ = Wire.read() << 8 | Wire.read(); //Store last two bytes into accelZ
-        gyro_value[0] = gyroX / 131.0;
-        gyro_value[1] = gyroY / 131.0;
-        gyro_value[2] = gyroZ / 131.0;
+        gyroX = gyroX / 131.0;
+        gyroY = gyroY / 131.0;
+        gyroZ = gyroZ / 131.0;
     }
 
 };
@@ -665,9 +665,12 @@ void loop() {
     memcpy(&value_sensor_all_data[11], val.intVal, 4);
 
     value_sensor_all_data[15]=touch_value;
+    gyro_value[0]=(int16_t)(gyroX* 100.0);
+    gyro_value[1]=(int16_t)(gyroY* 100.0);
+    gyro_value[2]=(int16_t)(gyroZ* 100.0);
+    // // 자이로 센서  값 추가 필요
+     memcpy(&value_sensor_all_data[15], gyro_value, 6);
 
-    // 자이로 센서  값 추가 필요
-    
     mCharSensorAllData->setValue((uint8_t*)&value_sensor_all_data, 30);
     if (device_connected) {
       mCharSensorAllData->notify();
